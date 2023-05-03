@@ -34,7 +34,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.text.TextFlow;
-
+import java.util.Random;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -51,6 +51,11 @@ public class ApiApp extends Application {
 
     public static final String DEFAULT_IMG = "file:resources/default.jpeg";
     public static Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    String[] appId1;
+    String[] appKey1;
+    String[] appId2;
+    String[] appKey2;
 
     Clipboard clipboard;
 
@@ -103,10 +108,9 @@ public class ApiApp extends Application {
         searchArea.setHgrow(urlSearch, Priority.ALWAYS);
         searchButton = new Button("Search");
 
-        recipeName = new Text("Search for a Recipe in the Search Box");
+        recipeName = new Text("Search for a Random Recipe in the Search Box");
         recipeName.setWrappingWidth(backgroundImage.getFitWidth());
         recipeName.setTextAlignment(TextAlignment.JUSTIFY);
-
 
         recipeInfo = new VBox(4);
         recipeInfo.setAlignment(Pos.CENTER);
@@ -133,7 +137,6 @@ public class ApiApp extends Application {
         copyButton = new Button("Copy Link");
         copyButton.setVisible(false);
 
-
         scroll = new ScrollPane(recipeInfo);
 
     } // ApiApp
@@ -142,6 +145,20 @@ public class ApiApp extends Application {
     @Override
     public void init() {
         System.out.println("init() called");
+
+
+        String[] id1 = {"47c19ceb", "139fca81", "6eb9f7d5"};
+        String[] key1 = {"70f21e3ad8feded302fe0126077a68b3", "e1168638f71b7e5361012a08dd44ae5d",
+            "4fddf9d4252b465ea4708911e576ea4b"};
+        appId1 = id1;
+        appKey1 = key1;
+
+        String[] id2 = {"6fb051cc", "591fb82e", "fd78c514", "3b427cc8", "38b7429e", "37a68482"};
+        String[] key2 = {"ffc9fcd9e08f0384f399e4b73c5c868e", "998637b84b6535609e2e83d8ebf2a063",
+            "c04320424b88b5cad6f5993f4008ce49", "c31610f859a6b0e4441c922e6c3e53c3",
+            "008b7f70bfb8147c16d7d167a91e5a84", "90947c5d004d25954a05de56937ab4c0"};
+        appId2 = id2;
+        appKey2 = key2;
 
         searchArea.getChildren().addAll(urlSearch, searchButton);
         searchArea.setMargin(urlSearch, new Insets(0, 0, 0, 10));
@@ -159,7 +176,9 @@ public class ApiApp extends Application {
 
         root.getChildren().addAll(topArea, scroll);
 
-        searchButton.setOnAction(event -> getRecipe());
+
+        Runnable thread = () -> this.getRecipe();
+        searchButton.setOnAction(event -> runNow(thread));
     } // init
 
 
@@ -184,11 +203,15 @@ public class ApiApp extends Application {
 
     } // start
 
+    /**
+     * Method to display a random recipe on the application.
+     */
     private void getRecipe() {
         String search = urlSearch.getText().replaceAll(" ", "%20");
         search = search.toLowerCase();
-        String app_id = "47c19ceb";
-        String app_key = "70f21e3ad8feded302fe0126077a68b3";
+        int randomId = randomize(appId1.length);
+        String app_id = appId1[randomId];
+        String app_key = appKey1[randomId];
         String query = String.format("&q=%s&app_id=%s&app_key=%s&ingr=10", search, app_id, app_key);
         String uri = "https://api.edamam.com/api/recipes/v2?type=public" + query;
         System.out.println(uri);
@@ -203,17 +226,19 @@ public class ApiApp extends Application {
             String jsonString = response.body();
             EdamamResponse edamamResponse = GSON.fromJson(jsonString, EdamamResponse.class);
 
-            String app_id2 = "fd78c514";
-            String app_key2 = "c04320424b88b5cad6f5993f4008ce49";
+            int rndmDish = randomize(edamamResponse.hits.length);
+
+            int randomId2 = randomize(appId2.length);
+            String app_id2 = appId2[randomId2];
+            String app_key2 = appKey2[randomId2];
             String uri2 = "https://api.edamam.com/api/nutrition-data?";
 
             int[] totalNutrition = new int[8];
-            for (int i = 0; i < 1; i++) {
-                System.out.println("Ingredient: " + edamamResponse.hits[0].recipe.ingredientLines[i]);
-                String search2 = edamamResponse.hits[0].recipe.ingredientLines[i];
+
+            for (int i = 0; i < edamamResponse.hits[rndmDish].recipe.ingredientLines.length; i++) {
+                String search2 = edamamResponse.hits[rndmDish].recipe.ingredientLines[i];
                 search2 = search2.replaceAll(" ", "%20");
                 search2 = search2.toLowerCase();
-                System.out.println("search2: " + search2);
                 String q2 = String.format("%sapp_id=%s&app_key=%s&nutrition-type=cooking&ingr=%s",
                     uri2, app_id2, app_key2, search2);
 
@@ -225,18 +250,11 @@ public class ApiApp extends Application {
 
                 EdamamNutrition edamamNut = GSON.fromJson(jsonString2, EdamamNutrition.class);
 
-                totalNutrition[0] += Math.round(edamamNut.totalNutrients.energy.quantity);
-                totalNutrition[1] += Math.round(edamamNut.totalNutrients.fat.quantity);
-                totalNutrition[2] += Math.round(edamamNut.totalNutrients.cholesterol.quantity);
-                totalNutrition[3] += Math.round(edamamNut.totalNutrients.sodium.quantity);
-                totalNutrition[4] += Math.round(edamamNut.totalNutrients.carbs.quantity);
-                totalNutrition[5] += Math.round(edamamNut.totalNutrients.sugar.quantity);
-                totalNutrition[6] += Math.round(edamamNut.totalNutrients.protein.quantity);
-                totalNutrition[7] += Math.round(edamamNut.totalNutrients.fiber.quantity);
+                totalNutrition = addNutritionTotals(edamamNut, totalNutrition);
             } // for
 
             addNutritionLabel(totalNutrition);
-            changeScene(edamamResponse);
+            Platform.runLater(() -> changeScene(edamamResponse, rndmDish));
 
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             System.err.println(e.getMessage());
@@ -244,6 +262,75 @@ public class ApiApp extends Application {
 
     } // getRecipe
 
+    /**
+     * Method used to add the individual nutrition values of each ingredient
+     * in a recipe.
+     *
+     * @param edamamNut the JSon-parsed class of {@code EdamamNutrition}.
+     * @param totalNutrition an array that holds the total added
+     * values of the nutrition categories of each ingredient.
+     *
+     * @return int[] an array that holds the total added values of the
+     * nutrition categories of each ingredient.
+     */
+    private int[] addNutritionTotals(EdamamNutrition edamamNut, int[] totalNutrition) {
+        if (edamamNut.totalNutrients.energy == null) {
+            totalNutrition[0] += 0;
+        } else {
+            totalNutrition[0] += Math.round(edamamNut.totalNutrients.energy.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.fat == null) {
+            totalNutrition[1] += 0;
+        } else {
+            totalNutrition[1] += Math.round(edamamNut.totalNutrients.fat.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.cholesterol == null) {
+            totalNutrition[2] += 0;
+        } else {
+            totalNutrition[2] += Math.round(edamamNut.totalNutrients.cholesterol.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.sodium == null) {
+            totalNutrition[3] += 0;
+        } else {
+            totalNutrition[3] += Math.round(edamamNut.totalNutrients.sodium.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.carbs == null) {
+            totalNutrition[4] += 0;
+        } else {
+            totalNutrition[4] += Math.round(edamamNut.totalNutrients.carbs.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.sugar == null) {
+            totalNutrition[5] += 0;
+        } else {
+            totalNutrition[5] += Math.round(edamamNut.totalNutrients.sugar.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.protein == null) {
+            totalNutrition[6] += 0;
+        } else {
+            totalNutrition[6] += Math.round(edamamNut.totalNutrients.protein.quantity);
+        } // else
+
+        if (edamamNut.totalNutrients.fiber == null) {
+            totalNutrition[7] += 0;
+        } else {
+            totalNutrition[7] += Math.round(edamamNut.totalNutrients.fiber.quantity);
+        } // else
+
+        return totalNutrition;
+    } // addNutritionTotals
+
+    /**
+     * Method used to add the nutrition facts to the scene.
+     *
+     * @param totNutrition an array that holds the total added
+     * values of the nutrition categories of each ingredient.
+     */
     private void addNutritionLabel(int[] totNutrition) {
         Text t1 = new Text("||\t\tNutrition\n");
         t1.setFont(new Font("Helvetica typeface", 18));
@@ -298,11 +385,20 @@ public class ApiApp extends Application {
         Text t9 = new Text(fiber);
         t9.setFont(new Font("Helvetica typeface", 14));
 
-        nutrition.getChildren().clear();
-        nutrition.getChildren().addAll(t1, t2, t3, t4, t5, t6, t7, t8, t9);
+        Platform.runLater(() -> nutrition.getChildren().clear());
+        Platform.runLater(() -> nutrition.getChildren().addAll(t1, t2, t3, t4, t5, t6, t7, t8, t9));
     } // addNutritionLabel
 
 
+    /**
+     * Method to change the variable names of the nutrition categories
+     * retrieved from the parsed Json string. This class exists to
+     * satisfy checkstyle.
+     *
+     * @param jsonString2 the jsonString being parsed, replacing
+     * variable names with names valid under checkstyle.
+     * @return String the new jsonString.
+     */
     private String changeVariables(String jsonString2) {
         jsonString2 = jsonString2.replaceAll("ENERC_KCAL", "energy");
         jsonString2 = jsonString2.replaceAll("FAT", "fat");
@@ -316,32 +412,52 @@ public class ApiApp extends Application {
         return jsonString2;
     } // changeVariables
 
+    /**
+     * Method to generate a random int.
+     *
+     * @param length the length of something (i.e. an array)
+     * @return int random integer
+     */
+    private int randomize(int length) {
+        Random random = new Random();
+        int randomInt = random.nextInt(length);
 
+        return randomInt;
+    } // randomize
 
-    private void changeScene(EdamamResponse response) {
+    /**
+     * Method to chage the elements on the scene and assign the
+     * values to previously unused variables.
+     *
+     * @param response the {@code EdamamResponse} class created from
+     * parsing the JSon string.
+     * @param random the random integer created to choose a random recipe.
+     */
+    private void changeScene(EdamamResponse response, int random) {
         backgroundImage.setPreserveRatio(false);
         backgroundImage.setFitHeight(100);
         backgroundImage.setFitWidth(620);
 
 
-        int ingredientLength = response.hits[0].recipe.ingredientLines.length;
-        int labelLength = response.hits[0].recipe.healthLabels.length;
+        int ingredientLength = response.hits[random].recipe.ingredientLines.length;
+        int labelLength = response.hits[random].recipe.healthLabels.length;
 
-        foodPic.setImage(new Image(response.hits[0].recipe.image));
+        foodPic.setImage(new Image(response.hits[random].recipe.image));
         foodPic.setFitWidth(150);
         foodPic.setFitHeight(150);
         foodPic.setSmooth(true);
 
-        String yieldString = Integer.toString(response.hits[0].recipe.yield);
+        double yieldValue = response.hits[random].recipe.yield;
+        String yieldString = Double.toString(yieldValue);
         yield.setText("Servings: " + yieldString);
         labels.setText("");
         for (int i = 0; i < labelLength; i++) {
-            String labelLine = response.hits[0].recipe.healthLabels[i];
+            String labelLine = response.hits[random].recipe.healthLabels[i];
             labelLine.replaceAll("-", " ");
             labels.setText(labels.getText() + labelLine + " * ");
         } // for
 
-        recipeName.setText(response.hits[0].recipe.label);
+        recipeName.setText(response.hits[random].recipe.label);
         recipeName.setFont(new Font(20));
 
         ingredients.setWrapText(true);
@@ -350,22 +466,39 @@ public class ApiApp extends Application {
 
         ingredients.setText("\tIngredients:\n");
         for (int i = 0; i < ingredientLength; i++) {
-            String ingrLine = response.hits[0].recipe.ingredientLines[i];
+            String ingrLine = response.hits[random].recipe.ingredientLines[i];
             ingredients.setText(ingredients.getText() + "- " + ingrLine + "\n");
         } // for
 
 
         recipeLink.setText("Recipe Link: \n");
-        String link = response.hits[0].recipe.url;
+        String link = response.hits[random].recipe.url;
         recipeLink.setText(recipeLink.getText() + link);
         copyButton.setVisible(true);
         copyButton.setOnAction(event -> copy(link));
     } // changeScene
 
+    /**
+     * Method to create the functionality of the {@code copyButton}.
+     *
+     * @param link the link to copy to the system clipboard.
+     */
     private void copy(String link) {
         ClipboardContent content = new ClipboardContent();
         content.putString(link);
         clipboard.setContent(content);
     } // copy
+
+    /**
+     * Creates and starts a new daemon thread that executes {@code target.run()}.
+     *
+     * @param target the object whose {@code run} method is called on when
+     * thread starts.
+     */
+    public static void runNow(Runnable target) {
+        Thread t = new Thread(target);
+        t.setDaemon(true);
+        t.start();
+    } // target
 
 } // ApiApp
