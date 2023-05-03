@@ -1,8 +1,8 @@
 package cs1302.api;
 
 /**
- * Represents a response from the Edamam Nutrition Analysis API.
+ * Represents a response from the Edamam Nutrion Analysis Search API.
  */
 public class EdamamNutrition {
-    TotalNutrients totalNutrients;
+    Nutrition totalNutrients;
 } // EdamamNutrition
