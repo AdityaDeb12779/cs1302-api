@@ -9,6 +9,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.paint.Color;
@@ -90,8 +92,10 @@ public class ApiApp extends Application {
      * constructor is executed in Step 2 of the JavaFX Application Life-Cycle.
      */
     public ApiApp() {
+        // Create a clipboard variable with access to user's system clipboard
         clipboard = Clipboard.getSystemClipboard();
 
+        // Initialize topArea of scene graph
         root = new VBox();
         topArea = new StackPane();
         backgroundImage = new ImageView(DEFAULT_IMG);
@@ -100,6 +104,7 @@ public class ApiApp extends Application {
         backgroundImage.setFitHeight(450);
         backgroundImage.setSmooth(true);
 
+        // Initialize searchArea of scene graph
         searchArea = new HBox(8);
         searchArea.setAlignment(Pos.CENTER);
         urlSearch = new TextField();
@@ -112,6 +117,7 @@ public class ApiApp extends Application {
         recipeName.setWrappingWidth(backgroundImage.getFitWidth());
         recipeName.setTextAlignment(TextAlignment.JUSTIFY);
 
+        // Initialize informational area of scene graph (present after search)
         recipeInfo = new VBox(4);
         recipeInfo.setAlignment(Pos.CENTER);
         picAndLabels = new HBox(8);
@@ -146,7 +152,7 @@ public class ApiApp extends Application {
     public void init() {
         System.out.println("init() called");
 
-
+        // Create an array with API ids and keys to use
         String[] id1 = {"47c19ceb", "139fca81", "6eb9f7d5"};
         String[] key1 = {"70f21e3ad8feded302fe0126077a68b3", "e1168638f71b7e5361012a08dd44ae5d",
             "4fddf9d4252b465ea4708911e576ea4b"};
@@ -160,23 +166,25 @@ public class ApiApp extends Application {
         appId2 = id2;
         appKey2 = key2;
 
+        // Add components of searchArea
         searchArea.getChildren().addAll(urlSearch, searchButton);
         searchArea.setMargin(urlSearch, new Insets(0, 0, 0, 10));
         searchArea.setMargin(searchButton, new Insets(0, 10, 0, 0));
 
+        // Add components of topArea
         topArea.getChildren().addAll(backgroundImage, searchArea);
 
+        // Add components of textArea
         textArea.getChildren().addAll(ingredients, nutrition);
-
         linkAndButton.getChildren().addAll(recipeLink, copyButton);
-
         nameAndLabels.getChildren().addAll(recipeName, yield, labels);
         picAndLabels.getChildren().addAll(foodPic, nameAndLabels);
         recipeInfo.getChildren().addAll(picAndLabels, textArea, linkAndButton);
 
+        // Add all components to root
         root.getChildren().addAll(topArea, scroll);
 
-
+        // Create the button event handler
         Runnable thread = () -> this.getRecipe();
         searchButton.setOnAction(event -> runNow(thread));
     } // init
@@ -207,6 +215,8 @@ public class ApiApp extends Application {
      * Method to display a random recipe on the application.
      */
     private void getRecipe() {
+        Platform.runLater(() -> searchButton.setDisable(true));
+        // Variables to query recipe search API
         String search = urlSearch.getText().replaceAll(" ", "%20");
         search = search.toLowerCase();
         int randomId = randomize(appId1.length);
@@ -214,53 +224,78 @@ public class ApiApp extends Application {
         String app_key = appKey1[randomId];
         String query = String.format("&q=%s&app_id=%s&app_key=%s&ingr=10", search, app_id, app_key);
         String uri = "https://api.edamam.com/api/recipes/v2?type=public" + query;
-        System.out.println(uri);
-
         try {
+            // If user left search area blank, throw message
+            if (urlSearch.getText().isEmpty()) {
+                throw new IllegalArgumentException("Search field cannot be empty");
+            } // if
+            // Send request to recipe search API
             HttpRequest request = HttpRequest.newBuilder().uri(URI.create(uri)).build();
             HttpResponse<String> response = HTTP_CLIENT.send(request, BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 throw new IOException(response.toString());
             } // if
-
             String jsonString = response.body();
             EdamamResponse edamamResponse = GSON.fromJson(jsonString, EdamamResponse.class);
 
+            // If results of search is 0, throw and exception
+            if (edamamResponse.hits.length <= 0) {
+                throw new IllegalArgumentException("No results for this query");
+            } // if
+            // Terms to help query Nutrition Analysis API
             int rndmDish = randomize(edamamResponse.hits.length);
-
             int randomId2 = randomize(appId2.length);
             String app_id2 = appId2[randomId2];
             String app_key2 = appKey2[randomId2];
             String uri2 = "https://api.edamam.com/api/nutrition-data?";
 
+            // Loop over ingredients in recipe and add up nutritional components
             int[] totalNutrition = new int[8];
-
             for (int i = 0; i < edamamResponse.hits[rndmDish].recipe.ingredientLines.length; i++) {
                 String search2 = edamamResponse.hits[rndmDish].recipe.ingredientLines[i];
-                search2 = search2.replaceAll(" ", "%20");
-                search2 = search2.toLowerCase();
+                search2 = search2.replaceAll(" ", "%20").toLowerCase();
                 String q2 = String.format("%sapp_id=%s&app_key=%s&nutrition-type=cooking&ingr=%s",
                     uri2, app_id2, app_key2, search2);
 
                 HttpRequest request2 = HttpRequest.newBuilder().uri(URI.create(q2)).build();
                 HttpResponse<String> resp2 = HTTP_CLIENT.send(request2, BodyHandlers.ofString());
-
                 String jsonString2 = resp2.body();
                 jsonString2 = changeVariables(jsonString2);
-
                 EdamamNutrition edamamNut = GSON.fromJson(jsonString2, EdamamNutrition.class);
 
                 totalNutrition = addNutritionTotals(edamamNut, totalNutrition);
             } // for
-
+            // Change scene graph
             addNutritionLabel(totalNutrition);
             Platform.runLater(() -> changeScene(edamamResponse, rndmDish));
-
+            Platform.runLater(() -> searchButton.setDisable(false));
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
-            System.err.println(e.getMessage());
+            // Throw an alert box if error occurs
+            Platform.runLater(() -> throwAlert(e, urlSearch.getText()));
         } // catch
-
     } // getRecipe
+
+    /**
+     * Method to throw an alert message displaying exception
+     * message and search term in textfield.
+     *
+     * @param e Exception thrown by program to be displayed
+     * by alert.
+     * @param searchTerm the String of the recipe search.
+     */
+    private void throwAlert(Exception e, String searchTerm) {
+        searchButton.setDisable(false);
+        // Sets message of alert
+        String alertMessage = "query: \"" + searchTerm + "\"";
+        alertMessage += "\n\nException: " + e.toString();
+        Alert alert = new Alert(AlertType.ERROR);
+        alert.setHeight(300);
+        alert.setWidth(550);
+        alert.setHeaderText("Error");
+        alert.setContentText(alertMessage);
+        alert.showAndWait();
+    } // throwAlert
+
 
     /**
      * Method used to add the individual nutrition values of each ingredient
@@ -332,53 +367,53 @@ public class ApiApp extends Application {
      * values of the nutrition categories of each ingredient.
      */
     private void addNutritionLabel(int[] totNutrition) {
+        // Creates header of nutrition label
         Text t1 = new Text("||\t\tNutrition\n");
         t1.setFont(new Font("Helvetica typeface", 18));
-
+        // Creates calories section of nutrition label
         String calories = "||\tCalories\t";
         int calQ = totNutrition[0];
         calories += calQ + "\n";
         Text t2 = new Text(calories);
         Font font2 = Font.font("Helvetica typeface", FontWeight.EXTRA_BOLD, 18);
         t2.setFont(font2);
-
-
+        // Creates fat section of nutrition label
         String fat = "||\tTotal Fat: ";
         int fatQ = totNutrition[1];
         fat += fatQ + " " + "g" + "\n";
         Text t3 = new Text(fat);
         t3.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates cholesterol section of nutrition label
         String cholesterol = "||\tCholesterol: ";
         int cholQ = totNutrition[2];
         cholesterol += cholQ + " " + "mg" + "\n";
         Text t4 = new Text(cholesterol);
         t4.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates sodium section of nutrition label
         String sodium = "||\tSodium: ";
         int sodiumQ = totNutrition[3];
         sodium += sodiumQ + " " + "mg" + "\n";
         Text t5 = new Text(sodium);
         t5.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates carbs section of nutrition label
         String carbs = "||\tTotal Carbohydrates: ";
         int carbsQ = totNutrition[4];
         carbs += carbsQ + " " + "g" + "\n";
         Text t6 = new Text(carbs);
         t6.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates sugar section of nutrition label
         String sugar = "||\tTotal Sugar: ";
         int sugarQ = totNutrition[5];
         sugar += sugarQ + " " + "g" + "\n";
         Text t7 = new Text(sugar);
         t7.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates protein section of nutrition label
         String protein = "||\tProtein: ";
         int proteinQ = totNutrition[6];
         protein += proteinQ + " " + "g" + "\n";
         Text t8 = new Text(protein);
         t8.setFont(new Font("Helvetica typeface", 14));
-
+        // Creates fiber section of nutrition label
         String fiber = "||\tTotal Fiber: ";
         int fiberQ = totNutrition[7];
         fiber += fiberQ + " " + "g" + "\n";
@@ -400,6 +435,8 @@ public class ApiApp extends Application {
      * @return String the new jsonString.
      */
     private String changeVariables(String jsonString2) {
+        // Replaces string in Json String to differnet names in order
+        // to pass check1302
         jsonString2 = jsonString2.replaceAll("ENERC_KCAL", "energy");
         jsonString2 = jsonString2.replaceAll("FAT", "fat");
         jsonString2 = jsonString2.replaceAll("CHOCDF", "carbs");
@@ -419,6 +456,7 @@ public class ApiApp extends Application {
      * @return int random integer
      */
     private int randomize(int length) {
+        // Creates a random object to generate a random int
         Random random = new Random();
         int randomInt = random.nextInt(length);
 
@@ -434,6 +472,7 @@ public class ApiApp extends Application {
      * @param random the random integer created to choose a random recipe.
      */
     private void changeScene(EdamamResponse response, int random) {
+        // Makes the title image like a banner
         backgroundImage.setPreserveRatio(false);
         backgroundImage.setFitHeight(100);
         backgroundImage.setFitWidth(620);
@@ -442,11 +481,13 @@ public class ApiApp extends Application {
         int ingredientLength = response.hits[random].recipe.ingredientLines.length;
         int labelLength = response.hits[random].recipe.healthLabels.length;
 
+        // Displays image of the food retrieved from Recipe Search API
         foodPic.setImage(new Image(response.hits[random].recipe.image));
         foodPic.setFitWidth(150);
         foodPic.setFitHeight(150);
         foodPic.setSmooth(true);
 
+        // Displays the total servings created by recipe and the nutrition labels
         double yieldValue = response.hits[random].recipe.yield;
         String yieldString = Double.toString(yieldValue);
         yield.setText("Servings: " + yieldString);
@@ -457,20 +498,23 @@ public class ApiApp extends Application {
             labels.setText(labels.getText() + labelLine + " * ");
         } // for
 
+        // Changes recipe name
         recipeName.setText(response.hits[random].recipe.label);
         recipeName.setFont(new Font(20));
 
+        // String formatting
         ingredients.setWrapText(true);
         ingredients.setTextAlignment(TextAlignment.JUSTIFY);
         ingredients.setMaxWidth(300);
 
+        // Displays the ingredients needed for recipe
         ingredients.setText("\tIngredients:\n");
         for (int i = 0; i < ingredientLength; i++) {
             String ingrLine = response.hits[random].recipe.ingredientLines[i];
             ingredients.setText(ingredients.getText() + "- " + ingrLine + "\n");
         } // for
 
-
+        // Displays the link for the recipe
         recipeLink.setText("Recipe Link: \n");
         String link = response.hits[random].recipe.url;
         recipeLink.setText(recipeLink.getText() + link);
@@ -484,6 +528,7 @@ public class ApiApp extends Application {
      * @param link the link to copy to the system clipboard.
      */
     private void copy(String link) {
+        // Copies the recipe link to user's system clipboard
         ClipboardContent content = new ClipboardContent();
         content.putString(link);
         clipboard.setContent(content);
