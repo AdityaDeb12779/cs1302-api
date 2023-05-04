@@ -255,7 +255,7 @@ public class ApiApp extends Application {
             int[] totalNutrition = new int[8];
             for (int i = 0; i < edamamResponse.hits[rndmDish].recipe.ingredientLines.length; i++) {
                 String search2 = edamamResponse.hits[rndmDish].recipe.ingredientLines[i];
-                search2 = search2.replaceAll(" ", "%20").toLowerCase();
+                search2 = search2.replaceAll(" ", "%20").replaceAll("\"", "").toLowerCase();
                 String q2 = String.format("%sapp_id=%s&app_key=%s&nutrition-type=cooking&ingr=%s",
                     uri2, app_id2, app_key2, search2);
 

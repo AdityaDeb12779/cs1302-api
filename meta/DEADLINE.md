@@ -18,9 +18,10 @@ GitHub repository URL: https://github.com/AdityaDeb12779/cs1302-api
 
 My app allows a user to search up whatever dish or food they want
 to create. Essentially, a user can search up a dish, and my app provides
-a recipe for a dish related to what the user searched up. My app provides
-the nutrition labels of a dish (i.e. gluten-free, vegetarian, soy-free, etc.),
-the picture of the dish, the servings of the dish, the ingredients of the dish,
+a recipe for either the searched dish , or a dish related to what the
+user searched up. My app provides the nutrition labels of a dish
+(i.e. gluten-free, vegetarian, soy-free, etc.), the picture of the dish,
+the servings of the dish, the ingredients of the dish,
 the nutrition facts of the dish (i.e. total carbs, total sugars, total fat, etc.),
 and a link to the website with the dish instructions.
 
