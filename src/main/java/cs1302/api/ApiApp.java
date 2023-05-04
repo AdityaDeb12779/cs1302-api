@@ -159,10 +159,12 @@ public class ApiApp extends Application {
         appId1 = id1;
         appKey1 = key1;
 
-        String[] id2 = {"6fb051cc", "591fb82e", "fd78c514", "3b427cc8", "38b7429e", "37a68482"};
+        String[] id2 = {"6fb051cc", "591fb82e", "fd78c514", "3b427cc8", "38b7429e", "37a68482",
+            "620866db", "e1612d18"};
         String[] key2 = {"ffc9fcd9e08f0384f399e4b73c5c868e", "998637b84b6535609e2e83d8ebf2a063",
             "c04320424b88b5cad6f5993f4008ce49", "c31610f859a6b0e4441c922e6c3e53c3",
-            "008b7f70bfb8147c16d7d167a91e5a84", "90947c5d004d25954a05de56937ab4c0"};
+            "008b7f70bfb8147c16d7d167a91e5a84", "90947c5d004d25954a05de56937ab4c0",
+            "a7bdae1232120635d8c543cc5ecc153f", "3e22cfa712b2b5b4d04b1b8bd5618842"};
         appId2 = id2;
         appKey2 = key2;
 
